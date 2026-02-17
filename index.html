@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurateur VRD Expert - Infragenia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .card { background: white; border-radius: 0.75rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); }
+        .step-btn.active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
+        #pdf-template { display: none; }
+        .tooltip { position: relative; display: inline-block; cursor: help; }
+        .tooltip .tooltiptext {
+            visibility: hidden; width: 220px; background-color: #1e293b; color: #fff;
+            text-align: center; border-radius: 6px; padding: 10px; position: absolute;
+            z-index: 50; bottom: 125%; left: 50%; margin-left: -110px; opacity: 0;
+            transition: opacity 0.3s; font-size: 12px; line-height: 1.4;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+        input[type=range] { accent-color: #4f46e5; height: 8px; border-radius: 5px; }
+        .step-btn:focus, tr:focus { outline: 2px solid #4f46e5; outline-offset: 2px; }
+        .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- Formulaire avec action fixe vers contact@infragenia.com -->
+    <form id="mainForm" action="https://formsubmit.co/contact@infragenia.com" method="POST" class="max-w-6xl mx-auto space-y-6" onsubmit="return handleSubmit(event)">
+        
+        <!-- Champs cachés -->
+        <input type="hidden" name="Total_HT" id="hiddenTotal">
+        <input type="hidden" name="Total_TTC" id="hiddenTotalTTC">
+        <input type="hidden" name="Surface_Projet" id="hiddenSurface">
+        <input type="hidden" name="Prix_M2_HT" id="hiddenRatio">
+        <input type="hidden" name="Services_Selectionnes" id="hiddenServices">
+
+        <!-- En-tête avec logo à gauche et texte à droite -->
+        <header class="flex flex-col md:flex-row items-start md:items-center border-b pb-6">
+            <img src="https://infragenia.com/gallery_gen/120095a432dea073805c23b61d039cec_626x306_fit.png?ts=1766422570" alt="Infragenia Logo" class="h-20 object-contain">
+            <div class="md:ml-auto text-left md:text-right mt-4 md:mt-0">
+                <h1 class="text-2xl font-bold text-slate-900 uppercase tracking-tight">Bureau d'études VRD</h1>
+                <p class="text-slate-500 text-sm italic">Expertise technique & Chiffrage de précision.</p>
+            </div>
+        </header>
+
+        <!-- Paragraphe explicatif pour les clients -->
+        <div class="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded-r-lg text-sm text-slate-700">
+            <p class="font-semibold mb-1">📐 Pourquoi cet outil ?</p>
+            <p>Cet estimateur vous permet de <strong>budgétiser vos études VRD</strong> en quelques clics avant même de nous solliciter. Sélectionnez la phase de votre projet, ajustez la surface, cochez les prestations souhaitées : une estimation immédiate apparaît. Vous pourrez ensuite <strong>télécharger un récapitulatif PDF</strong> et nous <strong>envoyer une demande de devis</strong> directement depuis cette interface. Simple, rapide et sans engagement.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- Phase -->
+                <div class="card p-6 space-y-4">
+                    <h2 class="text-lg font-bold text-slate-800 italic border-l-4 border-indigo-500 pl-3">1. Phase du projet</h2>
+                    <div class="grid grid-cols-3 gap-3">
+                        <button type="button" onclick="APP.setStep(0)" id="step0" class="step-btn active border p-3 rounded-xl text-sm font-semibold" tabindex="0" role="button">Faisabilité</button>
+                        <button type="button" onclick="APP.setStep(1)" id="step1" class="step-btn border p-3 rounded-xl text-sm font-semibold" tabindex="0" role="button">Permis (PC)</button>
+                        <button type="button" onclick="APP.setStep(2)" id="step2" class="step-btn border p-3 rounded-xl text-sm font-semibold" tabindex="0" role="button">DCE / Exécution</button>
+                    </div>
+                </div>
+
+                <!-- Surface -->
+                <div class="card p-6 space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-800 italic border-l-4 border-indigo-500 pl-3">2. Surface du projet</h2>
+                        <span id="surfaceDisplay" class="text-2xl font-black text-indigo-600">25 000 m²</span>
+                    </div>
+                    <div class="relative w-full pt-2">
+                        <input type="range" id="surfaceRange" min="500" max="100000" step="500" value="25000" oninput="APP.updateSurface(this.value)" class="w-full bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                        <div id="sliderLabels" class="relative w-full h-6 mt-4 text-[9px] font-bold text-slate-400 uppercase"></div>
+                    </div>
+                </div>
+
+                <!-- Coordonnées avec nouveaux champs -->
+                <div class="card p-6 space-y-4">
+                    <h2 class="text-lg font-bold text-slate-800 italic border-l-4 border-indigo-500 pl-3">3. Coordonnées</h2>
+                    
+                    <!-- Ligne 1 : Nom du projet (obligatoire) et Email (obligatoire) -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="clientName" class="block text-sm font-medium text-slate-700 mb-1">Nom du projet *</label>
+                            <input type="text" id="clientName" name="Client_Nom" placeholder="ex: ZAC des Cerisiers" class="p-3 border rounded-lg bg-slate-50 outline-indigo-500 w-full" required>
+                        </div>
+                        <div>
+                            <label for="contactEmail" class="block text-sm font-medium text-slate-700 mb-1">Email de contact *</label>
+                            <input type="email" id="contactEmail" name="Email" placeholder="votre@email.com" class="p-3 border rounded-lg bg-slate-50 outline-indigo-500 w-full" required>
+                        </div>
+                    </div>
+
+                    <!-- Nouveau champ : Nom du contact (optionnel) -->
+                    <div>
+                        <label for="contactName" class="block text-sm font-medium text-slate-700 mb-1">Nom du contact (prénom et nom)</label>
+                        <input type="text" id="contactName" name="Contact_Nom" placeholder="ex: Jean Dupont" class="p-3 border rounded-lg bg-slate-50 outline-indigo-500 w-full">
+                    </div>
+
+                    <!-- Nouveau champ : Commentaires (optionnel) -->
+                    <div>
+                        <label for="comments" class="block text-sm font-medium text-slate-700 mb-1">Informations complémentaires</label>
+                        <textarea id="comments" name="Commentaires" rows="3" placeholder="Décrivez votre projet, ses contraintes (type de terrain, délais, exigences particulières) ou toute information utile pour établir un devis plus précis." class="p-3 border rounded-lg bg-slate-50 outline-indigo-500 w-full"></textarea>
+                    </div>
+                </div>
+
+                <!-- Missions techniques -->
+                <div class="card overflow-hidden">
+                    <div class="p-4 bg-slate-50 border-b flex justify-between items-center">
+                        <h2 class="font-bold text-slate-700 italic border-l-4 border-indigo-500 pl-3">4. Missions techniques</h2>
+                        <button type="button" onclick="APP.toggleAll()" class="text-xs text-indigo-600 font-bold uppercase hover:underline">Tout cocher</button>
+                    </div>
+                    <table class="w-full text-left">
+                        <tbody id="servicesTable" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Colonne de droite : estimation -->
+            <div class="lg:col-span-1">
+                <div class="card p-6 sticky top-8 space-y-6 bg-slate-900 text-white shadow-2xl border-none">
+                    <h2 class="text-xl font-bold uppercase tracking-widest border-b border-slate-700 pb-4 text-center">Estimation des prestations</h2>
+                    
+                    <div id="recapList" class="space-y-3 text-xs text-slate-300"></div>
+                    
+                    <!-- Ligne TVA et totaux -->
+                    <div class="pt-4 border-t border-slate-700 space-y-2 text-xs">
+                        <div class="flex justify-between">
+                            <span>Total HT</span>
+                            <span id="totalHT" class="font-mono text-indigo-400">0 €</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>TVA (20%)</span>
+                            <span id="tvaAmount" class="font-mono text-indigo-400">0 €</span>
+                        </div>
+                        <div class="flex justify-between text-base font-bold pt-2 border-t border-slate-700">
+                            <span>Total TTC</span>
+                            <span id="totalTTC" class="text-indigo-300 text-xl">0 €</span>
+                        </div>
+                        <div id="pricePerM2" class="text-xs text-slate-400 mt-1 italic tracking-widest uppercase">Soit 0.00 € HT / m²</div>
+                    </div>
+
+                    <div class="pt-6 border-t border-slate-700 space-y-4 text-center">
+                        <button type="button" onclick="APP.generatePDF()" class="w-full py-3 border border-indigo-500/50 text-indigo-300 hover:bg-indigo-500 hover:text-white rounded-xl font-bold transition-all text-xs uppercase">📥 Télécharger le récapitulatif (PDF)</button>
+                        <button type="submit" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-black shadow-lg transition-all uppercase tracking-tighter">🚀 Demander un devis</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Template PDF (inchangé, mais pourrait être enrichi plus tard) -->
+    <div id="pdf-template" style="padding: 40px; color: #333; background: white;">
+        <div style="border-bottom: 2px solid #4f46e5; padding-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <img id="pdf-logo" src="https://infragenia.com/gallery_gen/120095a432dea073805c23b61d039cec_626x306_fit.png?ts=1766422570" style="height: 80px;" crossorigin="anonymous">
+            <div style="text-align: right;">
+                <h1 style="margin:0; font-size: 20px; color: #1e293b;">ESTIMATION DE PRESTATIONS VRD</h1>
+                <p id="pdf-date-text" style="margin:0; font-size: 11px; color: #64748b;"></p>
+            </div>
+        </div>
+        <div style="font-size: 11px; margin: 20px 0; border-left: 4px solid #4f46e5; padding-left: 10px; color: #475569;">
+            <strong>Infragenia</strong> - Ingénierie VRD. Ce document est une estimation pré-contractuelle établie à partir des éléments saisis. Pour un devis formel, merci de nous contacter.
+        </div>
+        <div style="font-size: 12px; margin-bottom: 20px;">
+            <p><strong>Projet :</strong> <span id="pdf-client"></span></p>
+            <p><strong>Phase :</strong> <span id="pdf-step"></span> | <strong>Surface :</strong> <span id="pdf-surface-val"></span></p>
+        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #4f46e5; color: white; text-align: left;">
+                    <th style="padding: 10px; font-size: 10px;">PRESTATION</th>
+                    <th style="padding: 10px; font-size: 10px; text-align: right;">MONTANT HT</th>
+                </tr>
+            </thead>
+            <tbody id="pdf-table-body"></tbody>
+        </table>
+        <div style="margin-top: 20px; text-align: right;">
+            <div style="font-size: 11px; color: #475569;">Total HT : <span id="pdf-total-ht"></span></div>
+            <div style="font-size: 11px; color: #475569;">TVA (20%) : <span id="pdf-tva"></span></div>
+            <div style="font-size: 16px; font-weight: bold; margin-top: 5px;">Total TTC : <span id="pdf-total-ttc" style="color: #4f46e5;"></span></div>
+            <div style="font-size: 10px; color: #64748b; margin-top: 5px;">Ratio HT / m² : <span id="pdf-ratio-val"></span></div>
+        </div>
+        <div id="legalMention" style="margin-top: 40px; font-size: 8px; color: #94a3b8; border-top: 1px solid #eee; padding-top: 10px;">
+            <!-- Mention légale dynamique -->
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // Configuration
+            const CONFIG = {
+                tauxJournalier: 750,
+                coefficientFraisGeneraux: 1.2,
+                tva: 0.20,
+                legalMention: "Estimation sans engagement valable 30 jours. TVA 20% - Infragenia - SIRET : [VOTRE NUMERO]."
+            };
+
+            const services = [
+                { id: 1, name: "Plan de nivellement", desc: "Altitudes et pentes pour l'écoulement naturel.", times: [1, 2, 5] },
+                { id: 2, name: "Plan de déblais remblais", desc: "Calcul des volumes de terre.", times: [0.25, 0.25, 1] },
+                { id: 3, name: "Plan des réseaux humides", desc: "Conception réseaux EU/EV/EP.", times: [0.5, 1.5, 3] },
+                { id: 4, name: "Plan des réseaux secs", desc: "Passage électricité, télécom et éclairage.", times: [0.25, 1, 2] },
+                { id: 5, name: "Plan de signalisation", desc: "Marquage et panneaux de sécurité.", times: [0.25, 0.5, 1.5] },
+                { id: 6, name: "Plan des revêtements", desc: "Choix des matériaux et structures.", times: [0.25, 0.5, 1] },
+                { id: 7, name: "Plan de gestion incendie", desc: "Points d'eau selon normes SDIS.", times: [0.25, 0.5, 0.75] },
+                { id: 8, name: "Plan de gestion pluviale", desc: "Dimensionnement rétention.", times: [1, 2.5, 4.5] },
+                { id: 9, name: "Note hydraulique", desc: "Dossier technique réglementaire.", times: [0.5, 2, 3.5] },
+                { id: 10, name: "Note de gestion des terres", desc: "Stratégie de réutilisation des terres.", times: [0.25, 0.5, 1] },
+                { id: 12, name: "Rédaction du CCTP", desc: "Cahier des charges techniques pour DCE.", times: [0, 0, 3] },
+                { id: 13, name: "Établissement du DPGF", desc: "Bordereau de prix pour analyse d'offres.", times: [0, 0, 2] },
+                { id: 11, name: "Plan d'exécution générale", desc: "Synthèse technique pour le chantier.", times: [0, 1, 4] }
+            ];
+
+            const steps = ["Faisabilité", "Permis de Construire", "DCE / Exécution"];
+
+            const APP = {
+                currentCoeff: 1.0,
+                currentSurface: 25000,
+                currentStep: 0,
+                selectedIds: new Set(),
+
+                init() {
+                    this.updateSurface(this.currentSurface);
+                    this.setStep(this.currentStep);
+                    this.updateSliderLabels();
+                    window.addEventListener('resize', () => this.updateSliderLabels());
+                },
+
+                format(value) {
+                    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
+                },
+
+                updateSurface(val) {
+                    this.currentSurface = parseInt(val);
+                    document.getElementById('surfaceDisplay').innerText = new Intl.NumberFormat('fr-FR').format(this.currentSurface) + " m²";
+                    document.getElementById('hiddenSurface').value = this.currentSurface + " m²";
+                    
+                    if (this.currentSurface < 12000) this.currentCoeff = 0.8;
+                    else if (this.currentSurface < 30000) this.currentCoeff = 1.0;
+                    else if (this.currentSurface < 60000) this.currentCoeff = 1.5;
+                    else this.currentCoeff = 2.2;
+
+                    this.render();
+                },
+
+                updateSliderLabels() {
+                    const min = 500, max = 100000;
+                    const labels = [500, 12000, 30000, 60000, 100000];
+                    const container = document.getElementById('sliderLabels');
+                    container.innerHTML = '';
+                    labels.forEach(val => {
+                        const percent = ((val - min) / (max - min)) * 100;
+                        const span = document.createElement('span');
+                        span.className = 'absolute text-[9px] font-bold text-slate-400 uppercase';
+                        span.style.left = percent + '%';
+                        span.style.transform = 'translateX(-50%)';
+                        span.innerText = val >= 1000 ? (val/1000).toFixed(0) + 'k' : val + ' m²';
+                        container.appendChild(span);
+                    });
+                },
+
+                setStep(i) {
+                    this.currentStep = i;
+                    document.querySelectorAll('.step-btn').forEach((b, idx) => {
+                        b.classList.toggle('active', idx === i);
+                    });
+                    this.render();
+                },
+
+                render() {
+                    const container = document.getElementById('servicesTable');
+                    const recap = document.getElementById('recapList');
+                    container.innerHTML = ''; recap.innerHTML = '';
+                    let totalHT = 0;
+
+                    services.forEach(s => {
+                        const baseTime = s.times[this.currentStep];
+                        if (baseTime === 0) return;
+                        const finalPrice = baseTime * this.currentCoeff * CONFIG.tauxJournalier * CONFIG.coefficientFraisGeneraux;
+                        const isSel = this.selectedIds.has(s.id);
+                        if (isSel) {
+                            totalHT += finalPrice;
+                            recap.innerHTML += `<div class="flex justify-between"><span>${s.name}</span><span class="text-indigo-400 font-bold">${this.format(finalPrice)}</span></div>`;
+                        }
+
+                        const tr = document.createElement('tr');
+                        tr.className = `cursor-pointer hover:bg-slate-50 ${isSel ? 'bg-indigo-50/50' : ''}`;
+                        tr.setAttribute('tabindex', '0');
+                        tr.setAttribute('role', 'checkbox');
+                        tr.setAttribute('aria-checked', isSel);
+                        tr.setAttribute('aria-label', `${s.name} : ${s.desc}`);
+                        tr.onclick = (e) => {
+                            if (e.target.tagName !== 'INPUT') this.toggleSvc(s.id);
+                        };
+                        tr.onkeydown = (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                this.toggleSvc(s.id);
+                            }
+                        };
+
+                        const tdCheck = document.createElement('td');
+                        tdCheck.className = 'p-4 w-10';
+                        const checkId = `svc-${s.id}`;
+                        tdCheck.innerHTML = `
+                            <input type="checkbox" id="${checkId}" ${isSel ? 'checked' : ''} class="accent-indigo-600">
+                            <label for="${checkId}" class="visually-hidden">Sélectionner ${s.name}</label>
+                        `;
+
+                        const tdName = document.createElement('td');
+                        tdName.className = 'p-4';
+                        tdName.innerHTML = `<div class="tooltip text-sm font-semibold">${s.name}<span class="tooltiptext">${s.desc}</span></div>`;
+
+                        const tdPrice = document.createElement('td');
+                        tdPrice.className = 'p-4 text-right font-mono text-xs font-bold';
+                        tdPrice.innerText = this.format(finalPrice);
+
+                        tr.appendChild(tdCheck);
+                        tr.appendChild(tdName);
+                        tr.appendChild(tdPrice);
+                        container.appendChild(tr);
+                    });
+
+                    const tva = totalHT * CONFIG.tva;
+                    const totalTTC = totalHT + tva;
+
+                    document.getElementById('totalHT').innerText = this.format(totalHT);
+                    document.getElementById('tvaAmount').innerText = this.format(tva);
+                    document.getElementById('totalTTC').innerText = this.format(totalTTC);
+
+                    document.getElementById('hiddenTotal').value = this.format(totalHT);
+                    document.getElementById('hiddenTotalTTC').value = this.format(totalTTC);
+                    
+                    const ratio = this.currentSurface > 0 ? (totalHT / this.currentSurface).toFixed(2) : '0.00';
+                    document.getElementById('pricePerM2').innerText = `Soit ${ratio} € HT / m²`;
+                    document.getElementById('hiddenRatio').value = ratio + " € HT / m²";
+
+                    const selectedServices = services.filter(s => this.selectedIds.has(s.id) && s.times[this.currentStep] > 0)
+                        .map(s => ({
+                            id: s.id,
+                            name: s.name,
+                            price_ht: this.format(s.times[this.currentStep] * this.currentCoeff * CONFIG.tauxJournalier * CONFIG.coefficientFraisGeneraux)
+                        }));
+                    document.getElementById('hiddenServices').value = JSON.stringify(selectedServices);
+                },
+
+                toggleSvc(id) {
+                    if (this.selectedIds.has(id)) this.selectedIds.delete(id);
+                    else this.selectedIds.add(id);
+                    this.render();
+                },
+
+                toggleAll() {
+                    if (this.selectedIds.size > 0) this.selectedIds.clear();
+                    else {
+                        services.forEach(s => {
+                            if (s.times[this.currentStep] > 0) this.selectedIds.add(s.id);
+                        });
+                    }
+                    this.render();
+                },
+
+                async generatePDF() {
+                    const template = document.getElementById('pdf-template');
+                    const logo = document.getElementById('pdf-logo');
+                    
+                    document.getElementById('pdf-client').innerText = document.getElementById('clientName').value || "Projet Infragenia";
+                    document.getElementById('pdf-step').innerText = steps[this.currentStep];
+                    document.getElementById('pdf-surface-val').innerText = new Intl.NumberFormat('fr-FR').format(this.currentSurface) + " m²";
+                    document.getElementById('pdf-date-text').innerText = "Le " + new Date().toLocaleDateString('fr-FR');
+                    
+                    const tbody = document.getElementById('pdf-table-body');
+                    tbody.innerHTML = '';
+                    let totalHT = 0;
+                    services.forEach(s => {
+                        if (this.selectedIds.has(s.id)) {
+                            const price = s.times[this.currentStep] * this.currentCoeff * CONFIG.tauxJournalier * CONFIG.coefficientFraisGeneraux;
+                            totalHT += price;
+                            tbody.innerHTML += `<tr><td style="padding:10px; border-bottom:1px solid #eee;"><div style="font-weight:bold; font-size:11px;">${s.name}</div><div style="font-size:9px; color:#666;">${s.desc}</div></td><td style="padding:10px; border-bottom:1px solid #eee; text-align:right; font-weight:bold;">${this.format(price)}</td></tr>`;
+                        }
+                    });
+
+                    const tva = totalHT * CONFIG.tva;
+                    const totalTTC = totalHT + tva;
+                    
+                    document.getElementById('pdf-total-ht').innerText = this.format(totalHT);
+                    document.getElementById('pdf-tva').innerText = this.format(tva);
+                    document.getElementById('pdf-total-ttc').innerText = this.format(totalTTC);
+                    
+                    const ratio = this.currentSurface > 0 ? (totalHT / this.currentSurface).toFixed(2) : '0.00';
+                    document.getElementById('pdf-ratio-val').innerText = ratio + " € HT / m²";
+
+                    document.getElementById('legalMention').innerText = CONFIG.legalMention;
+
+                    template.style.display = 'block';
+
+                    try {
+                        await Promise.race([
+                            new Promise((resolve, reject) => {
+                                if (logo.complete) resolve();
+                                else {
+                                    logo.onload = resolve;
+                                    logo.onerror = reject;
+                                }
+                            }),
+                            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout chargement logo')), 3000))
+                        ]);
+                    } catch (e) {
+                        console.warn("Logo non chargé, poursuite de la génération PDF.");
+                    }
+
+                    const opt = { 
+                        margin: 10, 
+                        filename: `Estimation_Infragenia.pdf`, 
+                        html2canvas: { scale: 2, useCORS: true }, 
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                    };
+                    await html2pdf().set(opt).from(template).save();
+                    template.style.display = 'none';
+                }
+            };
+
+            window.APP = APP;
+            document.addEventListener('DOMContentLoaded', () => APP.init());
+        })();
+
+        // Gestion de la soumission (inchangée)
+        function handleSubmit(event) {
+            const email = document.getElementById('contactEmail').value;
+            if (!email) {
+                alert("Veuillez saisir un email de contact.");
+                return false;
+            }
+            return true;
+        }
+    </script>
+</body>
+</html>
